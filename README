@@ -1,2 +1,11 @@
-This is the develop branch of the Noize Team
+This is the feature/ai branch of the Noize Team
+
+@Alberto questa è la branch per te
+when you will have finish to test the ai modules 
+just merge onto the develop branch
+
+git merge --no-ff develop
+
+Don't miss the no ff option: Here is why if you wanna know more
+https://stackoverflow.com/questions/9069061/what-is-the-difference-between-git-merge-and-git-merge-no-ff
 
