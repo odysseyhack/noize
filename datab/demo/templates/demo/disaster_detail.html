@@ -1,0 +1,18 @@
+{% extends "demo/basic_app_base.html" %}
+{% block body_block %}
+  <div class="jumbotron">
+    <h2>Disaster Details:</h2>
+    <p>Name: {{disaster_details.name}}</p>
+      {% for industry in disaster_details.disasters.all %}
+        <h3>Industry: Sugar Factory {{industry.name}}</h3>
+        <p>Principal: {{industry.owner}}</p>
+        <p>Location: {{industry.location}}</p>
+      {% endfor %}
+
+
+  </div>
+  <div class="container">
+    <p><a class='btn btn-warning' href="{% url 'demo:update' pk=disaster_details.pk %}">Update</a></p>
+  </div>
+
+{% endblock %}

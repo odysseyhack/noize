@@ -1,0 +1,15 @@
+{% extends "demo/basic_app_base.html" %}
+{% block body_block %}
+  <div class="jumbotron">
+
+    <h1>Last Disasters</h1>
+      <ol>
+        {% for disaster in disaster_list %}
+          <h2><li><a href="{{disaster.id}}/">{{disaster.name}} </a></li></h2>
+        {% endfor %}
+      </ol>
+
+  </div>
+
+
+{% endblock %}
