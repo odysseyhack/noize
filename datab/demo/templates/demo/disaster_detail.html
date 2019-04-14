@@ -3,7 +3,7 @@
   <div class="jumbotron">
     <h2>Disaster Details:</h2>
     <p>Name: {{disaster_details.name}}</p>
-      {% for industry in disaster_details.disasters.all %}
+      {% for industry in disaster_details.industries.all %}
         <h3>Industry: Sugar Factory {{industry.name}}</h3>
         <p>Principal: {{industry.owner}}</p>
         <p>Location: {{industry.location}}</p>
