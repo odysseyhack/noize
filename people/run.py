@@ -55,37 +55,7 @@ def process_yolo_outputs(outputs, args):
     return boxes, confidences
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='people counting')
-    parser.add_argument('--yolodir', default='/Users/alberto/projects/noize/noize/people/yolo-coco')
-    parser.add_argument('--video', default='/Users/alberto/projects/noize/noize/people/data/video.mp4', help='video file')
-    parser.add_argument('--min_confidence', type=float, default=0.3)
-    parser.add_argument('--nms_threshold', type=float, default=0.2)
-    args = parser.parse_args()
-
-    # load yolo stuff
-    net = cv2.dnn.readNetFromDarknet(os.path.join(args.yolodir, 'yolov3.cfg'), os.path.join(args.yolodir, 'yolov3.weights'))
-    label_names = open(os.path.join(args.yolodir, 'coco.names')).read().strip().split("\n")
-    lnames = net.getLayerNames()
-    lnames = [lnames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-    # load video
-    vs = cv2.VideoCapture(args.video)
-
-    while True:
-        # time.sleep(0.1)
-        ret, frame = vs.read()
-        if not ret:
-            break
-        frame = preprocess(frame)
-        outputs = yolo_detect(net, frame, lnames)
-
-        boxes, confidences = process_yolo_outputs(outputs, args)
-        print(boxes, confidences)
-
-        # non-max suppression
-        idxs = cv2.dnn.NMSBoxes(boxes, confidences, args.min_confidence, args.nms_threshold)
-
+def show_boxes(frame, idxs, boxes, confidences=None):
         for i in idxs.flatten():  # range(len(boxes)):
             # extract the bounding box coordinates
             (x, y) = (boxes[i][0], boxes[i][1])
@@ -98,6 +68,45 @@ if __name__ == '__main__':
             # cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
             #     0.5, color, 2)
 
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='people counting')
+    parser.add_argument('--yolodir',
+                        default='/Users/alberto/projects/noize/noize/people/yolo-coco',
+                        help='directory for yolo models')
+    parser.add_argument('--video',
+                        default='/Users/alberto/projects/noize/noize/people/data/video.mp4',
+                        help='video file')
+    parser.add_argument('--min_confidence', type=float, default=0.3)
+    parser.add_argument('--nms_threshold', type=float, default=0.2)
+    args = parser.parse_args()
+
+    # load yolo stuff
+    net = cv2.dnn.readNetFromDarknet(os.path.join(args.yolodir, 'yolov3.cfg'),
+                                     os.path.join(args.yolodir, 'yolov3.weights'))
+    label_names = open(os.path.join(args.yolodir, 'coco.names')).read().strip().split("\n")
+    lnames = net.getLayerNames()
+    lnames = [lnames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+
+    # load video
+    vs = cv2.VideoCapture(args.video)
+
+    while True:
+        ret, frame = vs.read()
+        if not ret:
+            break
+        frame = preprocess(frame)
+
+        # detection
+        outputs = yolo_detect(net, frame, lnames)
+        boxes, confidences = process_yolo_outputs(outputs, args)
+        print(boxes, confidences)
+
+        # non-max suppression
+        idxs = cv2.dnn.NMSBoxes(boxes, confidences, args.min_confidence, args.nms_threshold)
+
+        # show things
+        show_boxes(frame, idxs, boxes, confidences):
         cv2.imshow("Frame", frame)
         cv2.waitKey(0)
         key = cv2.waitKey(1) & 0xFF
