@@ -114,10 +114,15 @@ if __name__ == '__main__':
     parser.add_argument('--video',
                         default='/Users/alberto/projects/noize/noize/people/data/video.mp4',
                         help='video file')
+    parser.add_argument('--out_video',
+                        default='people.mp4',
+                        help='output video file')
     parser.add_argument('--frame_delta', type=int, default=5)
     parser.add_argument('--min_confidence', type=float, default=0.3)
     parser.add_argument('--nms_threshold', type=float, default=0.2)
     parser.add_argument('--max_match_dist', type=float, default=50.0)
+    parser.add_argument('--initial_num_people', type=int, default=3,
+                        help='initial number of people at the beginning of the video')
     args = parser.parse_args()
 
     # load yolo stuff
@@ -130,8 +135,13 @@ if __name__ == '__main__':
     # load video
     vs = cv2.VideoCapture(args.video)
 
+    # output video setup
+    if args.out_video:
+        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+        writer = cv2.VideoWriter(args.out_video, fourcc, 5.0, (W, H))
+
     # setup crossing people counter
-    num_people_inside = 2
+    num_people_inside = args.initial_num_people
     frame = None
 
     line_start, line_end = (10, 220), (500, 10)
@@ -189,10 +199,15 @@ if __name__ == '__main__':
         text = "people inside: {}".format(num_people_inside)
         cv2.putText(frame, text, (W // 2 - 20, H - 7), cv2.FONT_HERSHEY_SIMPLEX,
             0.5, (255, 0, 255), 2)
+
+        if args.out_video:
+            writer.write(frame)
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
 
+    if args.out_video:
+        writer.release()
     vs.release()
     cv2.destroyAllWindows()
