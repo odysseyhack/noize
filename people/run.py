@@ -4,10 +4,10 @@ import numpy as np
 import os
 import time
 
-W, H = 416, 416
+W, H = 544, 416
 
 def preprocess(frame):
-    frame = frame[50:-50, 300:-300]  # crop
+    frame = frame[50:-50, 150:-150]  # crop
     (h, w) = frame.shape[:2]
     # frame = cv2.resize(frame, (416, int(416. * h / w)))  # resize
     frame = cv2.resize(frame, (W, H))  # resize
@@ -23,6 +23,7 @@ def yolo_detect(net, frame, layer_names):
 
 
 def process_yolo_outputs(outputs, args):
+    centers = []
     boxes = []
     confidences = []
     for output in outputs:
@@ -49,14 +50,15 @@ def process_yolo_outputs(outputs, args):
                 y = int(centerY - (height / 2))
 
                 if classID == 0: # only keep the class PERSON
+                    centers.append([centerX, centerY])
                     boxes.append([x, y, int(width), int(height)])
                     confidences.append(float(confidence))
 
-    return boxes, confidences
+    return centers, boxes, confidences
 
 
 def show_boxes(frame, idxs, boxes, confidences=None):
-        for i in idxs.flatten():  # range(len(boxes)):
+        for i in idxs:  # range(len(boxes)):
             # extract the bounding box coordinates
             (x, y) = (boxes[i][0], boxes[i][1])
             (w, h) = (boxes[i][2], boxes[i][3])
@@ -77,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--video',
                         default='/Users/alberto/projects/noize/noize/people/data/video.mp4',
                         help='video file')
+    parser.add_argument('--frame_delta', type=int, default=5)
     parser.add_argument('--min_confidence', type=float, default=0.3)
     parser.add_argument('--nms_threshold', type=float, default=0.2)
     args = parser.parse_args()
@@ -91,24 +94,32 @@ if __name__ == '__main__':
     # load video
     vs = cv2.VideoCapture(args.video)
 
+    f = 0
     while True:
         ret, frame = vs.read()
         if not ret:
             break
+        f += 1
+        if f % args.frame_delta != 0: # skip some framew to go faster
+            continue
+
         frame = preprocess(frame)
 
         # detection
         outputs = yolo_detect(net, frame, lnames)
-        boxes, confidences = process_yolo_outputs(outputs, args)
-        print(boxes, confidences)
+        centers, boxes, confidences = process_yolo_outputs(outputs, args)
+        # print(boxes, confidences)
 
         # non-max suppression
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, args.min_confidence, args.nms_threshold)
+        if not isinstance(idxs, tuple):
+            idxs = idxs.flatten()
+        centers = [centers[idx] for idx in idxs]
+        print(centers)
 
         # show things
-        show_boxes(frame, idxs, boxes, confidences):
+        show_boxes(frame, idxs, boxes, confidences)
         cv2.imshow("Frame", frame)
-        cv2.waitKey(0)
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
