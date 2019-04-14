@@ -50,7 +50,7 @@ def process_yolo_outputs(outputs, args):
                 y = int(centerY - (height / 2))
 
                 if classID == 0: # only keep the class PERSON
-                    centers.append([centerX, centerY])
+                    centers.append((centerX, centerY))
                     boxes.append([x, y, int(width), int(height)])
                     confidences.append(float(confidence))
 
@@ -71,6 +71,41 @@ def show_boxes(frame, idxs, boxes, confidences=None):
             #     0.5, color, 2)
 
 
+def _distance(a, b):
+    return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+
+
+class BasicTracker:
+    def __init__(self, on_move_fn=None, max_match_dist=10):
+        '''
+        on_move_fn: called with (old_pos, new_pos) when a movement is found
+        max_match_dist: maximum movement distance allowed for match in consecutive frames
+        '''
+        self.people = []
+        self.on_move_fn = on_move_fn
+        self.max_match_dist = max_match_dist
+
+    def update(self, centers):
+        new_people = []
+        for c in centers:
+            if not self.people:
+                # add new tracker
+                new_people.append(c)
+            else:
+                # find closest person being tracked
+                dists = [_distance(c, p) for p in self.people]
+                idx = np.argmin(dists)
+                d = dists[idx]
+                if d < self.max_match_dist:
+                    # found match, move person
+                    if self.on_move_fn is not None:
+                        self.on_move_fn(self.people[idx], c)
+                    new_people.append(c)
+                    del self.people[idx]
+        self.people = new_people
+        print('people:', self.people)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='people counting')
     parser.add_argument('--yolodir',
@@ -82,6 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--frame_delta', type=int, default=5)
     parser.add_argument('--min_confidence', type=float, default=0.3)
     parser.add_argument('--nms_threshold', type=float, default=0.2)
+    parser.add_argument('--max_match_dist', type=float, default=50.0)
     args = parser.parse_args()
 
     # load yolo stuff
@@ -94,13 +130,41 @@ if __name__ == '__main__':
     # load video
     vs = cv2.VideoCapture(args.video)
 
-    f = 0
+    # setup crossing people counter
+    num_people_inside = 2
+    frame = None
+
+    line_start, line_end = (10, 220), (500, 10)
+    line_vec = (line_end[0] - line_start[0], line_end[1] - line_start[1])
+    def _cross(a, b):
+        return a[0] * b[1] - a[1] * b[0]
+
+    def on_move(old_pos, new_pos):
+        global num_people_inside, frame
+        if frame is not None:
+            cv2.line(frame, old_pos, new_pos, (0, 255, 0), 2)
+        old_vec = (old_pos[0] - line_start[0], old_pos[1] - line_start[1])
+        new_vec = (new_pos[0] - line_start[0], new_pos[1] - line_start[1])
+        co, cn = _cross(line_vec, old_vec), _cross(line_vec, new_vec)
+        print('someone moved!', co, cn)
+
+        if co <= 0 and cn > 0:
+            num_people_inside += 1
+            print('one person entered. total =', num_people_inside)
+        if co > 0 and cn <= 0:
+            num_people_inside -= 1
+            print('one person left. total =', num_people_inside)
+
+    # init tracker
+    tracker = BasicTracker(on_move_fn=on_move, max_match_dist=args.max_match_dist)
+
+    f = 0  # frame counter
     while True:
         ret, frame = vs.read()
         if not ret:
             break
         f += 1
-        if f % args.frame_delta != 0: # skip some framew to go faster
+        if f % args.frame_delta != 0:  # skip some framew to go faster
             continue
 
         frame = preprocess(frame)
@@ -115,10 +179,16 @@ if __name__ == '__main__':
         if not isinstance(idxs, tuple):
             idxs = idxs.flatten()
         centers = [centers[idx] for idx in idxs]
-        print(centers)
+        print('detection positions:', centers)
+
+        tracker.update(centers)
 
         # show things
         show_boxes(frame, idxs, boxes, confidences)
+        cv2.line(frame, line_start, line_end, (0, 255, 255), 2)
+        text = "people inside: {}".format(num_people_inside)
+        cv2.putText(frame, text, (W // 2 - 20, H - 7), cv2.FONT_HERSHEY_SIMPLEX,
+            0.5, (255, 0, 255), 2)
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
