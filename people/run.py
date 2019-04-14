@@ -4,7 +4,7 @@ import numpy as np
 import os
 import time
 
-W, H = 544, 416
+W, H = 544, 416  # output frame size
 
 def preprocess(frame):
     frame = frame[50:-50, 150:-150]  # crop
@@ -78,6 +78,12 @@ def _distance(a, b):
 class BasicTracker:
     def __init__(self, on_move_fn=None, max_match_dist=10):
         '''
+        Basic tracker: only matches when the detection moves within a radius `max_match_dist`.
+            When there is a movement, the callback on_move_fn is called.
+            TODO: make a better tracker w/ filtering and that doesn't lose track of people
+            when a detection goes missing...
+
+        Args:
         on_move_fn: called with (old_pos, new_pos) when a movement is found
         max_match_dist: maximum movement distance allowed for match in consecutive frames
         '''
@@ -177,20 +183,21 @@ if __name__ == '__main__':
         if f % args.frame_delta != 0:  # skip some framew to go faster
             continue
 
+        # basic preprocessing
         frame = preprocess(frame)
 
-        # detection
+        # detection with yolo
         outputs = yolo_detect(net, frame, lnames)
         centers, boxes, confidences = process_yolo_outputs(outputs, args)
-        # print(boxes, confidences)
 
-        # non-max suppression
+        # run non-max suppression (remove redundant detections)
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, args.min_confidence, args.nms_threshold)
         if not isinstance(idxs, tuple):
             idxs = idxs.flatten()
         centers = [centers[idx] for idx in idxs]
         print('detection positions:', centers)
 
+        # update tracker with the new detections
         tracker.update(centers)
 
         # show things
@@ -198,7 +205,7 @@ if __name__ == '__main__':
         cv2.line(frame, line_start, line_end, (0, 255, 255), 2)
         text = "people inside: {}".format(num_people_inside)
         cv2.putText(frame, text, (W // 2 - 20, H - 7), cv2.FONT_HERSHEY_SIMPLEX,
-            0.5, (255, 0, 255), 2)
+                    0.5, (255, 0, 255), 2)
 
         if args.out_video:
             writer.write(frame)
