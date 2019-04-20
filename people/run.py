@@ -109,10 +109,10 @@ class BasicTracker:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='people counting')
     parser.add_argument('--yolodir',
-                        default='/Users/alberto/projects/noize/noize/people/yolo-coco',
+                        default='yolo-coco',
                         help='directory for yolo models')
     parser.add_argument('--video',
-                        default='/Users/alberto/projects/noize/noize/people/data/video.mp4',
+                        default='data/video.mp4',
                         help='video file')
     parser.add_argument('--out_video',
                         default='people.mp4',
